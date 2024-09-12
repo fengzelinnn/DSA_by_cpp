@@ -6,15 +6,18 @@
 
 using namespace std;
 
+//TODO (1): adapt all operators;
+//TODO (2): finish the de_mod function
+
 // Prime judge using OpenSSL
 bool isPrime(const BIGNUM* n, BN_CTX* ctx) {
     BIGNUM* r = BN_new();
     if (!r) {
-        std::cerr << "Failed to create BIGNUM" << std::endl;
+        std::cerr << "Failed to create BIG NUM" << std::endl;
         return false;
     }
 
-    const int ret = BN_check_prime(n, ctx, NULL);
+    const int ret = BN_check_prime(n, ctx, nullptr);
 
     BN_free(r);
     if (ret == -1) {
@@ -34,7 +37,7 @@ BIGNUM* bigPrimeBuilder() {
     BN_CTX* ctx = BN_CTX_new();
 
     if (!p || !range || !ctx) {
-        std::cerr << "Failed to create BIGNUM or BN_CTX" << std::endl;
+        std::cerr << "Failed to create BIG NUM or BN_CTX" << std::endl;
         return nullptr;
     }
 
@@ -62,40 +65,44 @@ BIGNUM* bigPrimeBuilder() {
 }
 
 //find an element of p - 1 which is a prime
-long long elementOfBigPrime(long long n) {
-    const long lwoRange = pow(2, 159);
-    const long highRange = pow(2, 160);
-    long long q;
+BIGNUM* elementOfBigPrime(const BIGNUM* n) {
+    BN_CTX* ctx = BN_CTX_new();
+    const long double lwoRange = pow(2, 159);
+    const long double highRange = pow(2, 160);
+    BIGNUM* q = BN_new();
     while (true) {
-        q = lwoRange + rand() % (highRange - lwoRange);
-        if (isPrime(q) && n % q == 0) {
+        long double r = rand();
+        q = lwoRange + r % (highRange - lwoRange);
+
+        if (isPrime(q, ctx) && n % q == 0) {
             break;
         }
     }
+    BN_CTX_free(ctx);
     cout << "密钥分量q = " << q << endl;
     return q;
 }
 
 //T ODO: finish the hash function
-long long SHA_hash(const string &M) {
+BIGNUM* SHA_hash(const string &M) {
     EVP_MD_CTX *ctx = EVP_MD_CTX_new();
-    if (!ctx) return 0;
+    if (!ctx) return nullptr;
     if (!EVP_DigestInit_ex(ctx, EVP_sha256(), nullptr)) {
         EVP_MD_CTX_free(ctx);
-        return 0;
+        return nullptr;
     }
     if (!EVP_DigestUpdate(ctx, M.c_str(), M.length())) {
         EVP_MD_CTX_free(ctx);
-        return 0;
+        return nullptr;
     }
     unsigned char hash[EVP_MAX_MD_SIZE];
     unsigned int lengthOfHash = 0;
     if (!EVP_DigestFinal_ex(ctx, hash, &lengthOfHash)) {
         EVP_MD_CTX_free(ctx);
-        return 0;
+        return nullptr;
     }
     EVP_MD_CTX_free(ctx);
-    long long result = 0;
+    BIGNUM* result = BN_new();
     for(int i = 0; i < 8 && i < lengthOfHash; i++) {
         result = (result << 8) + hash[i];
     }
@@ -103,18 +110,18 @@ long long SHA_hash(const string &M) {
     return result;
 }
 
-pair<int, int> DSA_sign(const long k, const int g, long long p, long long q, const string& M) {
-    long long e = SHA_hash(M);
+pair<int, int> DSA_sign(const long k, const int g, const BIGNUM* p, const BIGNUM* q, const string& M) {
+    BIGNUM* e = SHA_hash(M);
     int r = (pow(g, k) % p) % q;
-    int s = 0; //TODO: finish de_mod calculation
+    int s = 0;
     pair<int, int> DS = make_pair(r, s);
     return DS;
 }
 
-bool DSA_verify(const string& M, const pair<int, int> &sign, const int g, long long q, const long y, long long p) {
+bool DSA_verify(const string& M, const pair<int, int> &sign, const int g, const BIGNUM* q, const long y, const BIGNUM* p) {
     if (0 < sign.first < q && 0 < sign.second < q) {
-        const long long e = SHA_hash(M);
-        constexpr int w = 0; //TODO: de_mod
+        BIGNUM *e = SHA_hash(M);
+        constexpr int w = 0;
         const long long u1 = (e * w) % q;
         const long long u2 = (sign.first * w) % q;
         if (const int v = ((pow(g, u1) * pow(y, u2)) % p) % q; v == sign.first) {
@@ -125,8 +132,9 @@ bool DSA_verify(const string& M, const pair<int, int> &sign, const int g, long l
 }
 
 int main() {
-    const long long p = bigPrimeBuilder();
-    const long long q = elementOfBigPrime(p - 1);
+    if (const BN_CTX *ctx = BN_CTX_new(); !ctx) return 0;
+    const BIGNUM* p = bigPrimeBuilder();
+    const BIGNUM* q = elementOfBigPrime(p);
 
     int h = 0;
     while(true) {
@@ -139,7 +147,6 @@ int main() {
 
     int g = pow(h, (p - 1) / q) % p;
     cout << "密钥分量g:" <<g << endl;
-    //TODO: try to use % on a big number
 
     long x = rand() % q;
     cout << "用户私钥x：" << x << endl;
@@ -147,14 +154,12 @@ int main() {
     long y = pow(g, x) % p;
      cout << "用户公钥y：" << y << endl;
 
-    long k = rand() % q;
+    const long k = rand() % q;
     cout << "随机数k：" << k << endl;
 
     const string message = "This is a test for DSA";
 
-    pair<int, int> sign = DSA_sign(k, g, p, q, message);
-
-    if (DSA_verify(message, sign, g, q, y, p) == true) {
+    if (const pair<int, int> sign = DSA_sign(k, g, p, q, message); DSA_verify(message, sign, g, q, y, p) == true) {
         cout << "verify OK" << endl;
     } else {
         cout << "verify FAILED" << endl;
