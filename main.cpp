@@ -8,12 +8,20 @@ using namespace std;
 
 // Prime judge using OpenSSL
 bool isPrime(const BIGNUM* n, BN_CTX* ctx) {
-    const int is_prime = BN_is_prime_ex(n, BN_prime_checks, ctx, nullptr);
-    if (is_prime == -1) {
-        ERR_print_errors_fp(stderr);
+    BIGNUM* r = BN_new();
+    if (!r) {
+        std::cerr << "Failed to create BIGNUM" << std::endl;
         return false;
     }
-    return is_prime != 0;
+
+    const int ret = BN_check_prime(n, ctx, NULL);
+
+    BN_free(r);
+    if (ret == -1) {
+        std::cerr << "BN_check_prime failed" << std::endl;
+        return false;
+    }
+    return ret != 0;
 }
 
 // Product a prime in (2^(L-1), 2^L), L is a multiple of 64 which between 512 and 1024.
@@ -26,8 +34,7 @@ BIGNUM* bigPrimeBuilder() {
     BN_CTX* ctx = BN_CTX_new();
 
     if (!p || !range || !ctx) {
-        // Handle error
-        ERR_print_errors_fp(stderr);
+        std::cerr << "Failed to create BIGNUM or BN_CTX" << std::endl;
         return nullptr;
     }
 
@@ -44,8 +51,9 @@ BIGNUM* bigPrimeBuilder() {
     }
 
     std::cout << "密钥分量p = ";
-    BN_print_fp(stdout, p);
-    std::cout << std::endl;
+    char* p_str = BN_bn2dec(p);
+    std::cout << p_str << std::endl;
+    OPENSSL_free(p_str);
 
     BN_free(range);
     BN_CTX_free(ctx);
