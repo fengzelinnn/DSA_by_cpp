@@ -64,70 +64,63 @@ BIGNUM* bigPrimeBuilder() {
 }
 
 //find an element of p - 1 which is a prime
-BIGNUM* elementOfBigPrime(const BIGNUM* n) {
-    BIGNUM* q = BN_new();
-    BIGNUM* r_bn = BN_new();
-    BIGNUM* range = BN_new();
-    BIGNUM* temp = BN_new();
+BIGNUM* elementOfBigPrime(BIGNUM* p) {
     BN_CTX* ctx = BN_CTX_new();
+    BIGNUM *q = BN_new(), *r_bn = BN_new(), *range = BN_new(), *temp = BN_new();
+    BIGNUM *lowRange = BN_new(), *highRange = BN_new(), *temp2 = BN_new();
 
-    if (!q || !r_bn || !range || !temp || !ctx) {
-        // 错误处理
-        std::cerr << "Failed to create BIG NUM or BN_CTX" << std::endl;
-        // 记得释放已分配的内存
-        return nullptr;
-    }
-
-    BIGNUM* lowRange = BN_new();
-    BIGNUM* highRange = BN_new();
-
-    if (!lowRange || !highRange) {
+    if (!ctx || !q || !r_bn || !range || !temp || !lowRange || !highRange || !temp2) {
         // 错误处理
         std::cerr << "Failed to create BIG NUM or BN_CTX" << std::endl;
         // 释放已分配的内存
-        BN_free(lowRange);
-        BN_free(highRange);
+        BN_free(q); BN_free(r_bn); BN_free(range); BN_free(temp);
+        BN_free(lowRange); BN_free(highRange); BN_free(temp2);
         BN_CTX_free(ctx);
-        return nullptr; // 或者其他适当的错误处理
+        return nullptr;
     }
 
-    // 设置 lowRange 为 2^159
+    // 设置范围
     BN_set_bit(lowRange, 159);
-
-    // 设置 highRange 为 2^160
     BN_set_bit(highRange, 160);
+    BN_sub(range, highRange, lowRange);
+
+    // 使用更好的随机数生成器
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<unsigned long long> dis;
+
+    BIGNUM* one = BN_new();
+    BN_one(one);
+    BN_sub(p, p, one);
+    cout << "current p-1:" << BN_bn2dec(p) << endl;
 
     while (true) {
-        char r_str[256];
-        random_device rd;
-        const long double r = rd();
-        snprintf(r_str, sizeof(r_str), "%.0Lf", r);
-        BN_dec2bn(&r_bn, r_str);
+        // 生成随机数
+        const unsigned long long r = dis(gen);
+        BN_set_word(r_bn, r);
 
-        // 计算 highRange - lowRange
-        BN_sub(range, highRange, lowRange);
-
-        // 计算 r % (highRange - lowRange)
+        // 计算 q = lowRange + (r_bn % range)
         BN_mod(temp, r_bn, range, ctx);
-
-        // 计算 lowRange + (r % (highRange - lowRange))
         BN_add(q, lowRange, temp);
 
-        BIGNUM* temp2 = BN_new();
-        BN_mod(temp2, n, q, ctx);
-        if (isPrime(q, ctx) && temp2 == nullptr) {
-            // 清理
-            BN_free(r_bn);
-            BN_free(range);
-            BN_free(temp);
-            BN_free(temp2);
-            BN_free(lowRange);
-            BN_free(highRange);
-            BN_CTX_free(ctx);
+        // 检查 q 是否为素数且是否为 p - 1 的因子
+        if (isPrime(q, ctx) && BN_mod(temp2, p, q, ctx) && BN_is_zero(temp2)) {
+            char *q_str = BN_bn2dec(q);
+            std::cout << "密钥分量q = " << q_str << std::endl;
+            OPENSSL_free(q_str);
             break;
         }
+
+        char *q_str = BN_bn2dec(q);
+        cout << "current q:" << q_str << endl;
+        OPENSSL_free(q_str);
     }
-    cout << "密钥分量q = " << q << endl;
+
+    // 清理
+    BN_free(r_bn); BN_free(range); BN_free(temp);
+    BN_free(lowRange); BN_free(highRange); BN_free(temp2); BN_free(one);
+    BN_CTX_free(ctx);
+
     return q;
 }
 
@@ -332,8 +325,9 @@ bool DSA_verify(const string& M, const pair<BIGNUM*, BIGNUM*>& sign, const BIGNU
 
 int main() {
     if (const BN_CTX *ctx = BN_CTX_new(); !ctx) return 0;
-    const BIGNUM* p = bigPrimeBuilder();
-    const BIGNUM* q = elementOfBigPrime(p);
+    BIGNUM* p = bigPrimeBuilder();
+    BIGNUM* p_temp = p;
+    const BIGNUM* q = elementOfBigPrime(p_temp);
 
     BN_CTX* ctx = BN_CTX_new();
     if (!ctx) {
