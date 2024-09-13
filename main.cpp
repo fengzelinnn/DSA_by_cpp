@@ -8,7 +8,7 @@
 using namespace std;
 
 // 素性判定函数
-bool isPrime(const BIGNUM* n, BN_CTX* ctx) {
+bool isPrime(const BIGNUM *n, BN_CTX *ctx) {
     const int ret = BN_check_prime(n, ctx, nullptr);
     if (ret == -1) {
         cerr << "BN_check_prime failed" << endl;
@@ -18,14 +18,16 @@ bool isPrime(const BIGNUM* n, BN_CTX* ctx) {
 }
 
 // 产生160bit长的素数q
-BIGNUM* generateQ() {
-    BN_CTX* ctx = BN_CTX_new();
-    BIGNUM* q = BN_new();
-    BIGNUM* range = BN_new();
+BIGNUM *generateQ() {
+    BN_CTX *ctx = BN_CTX_new();
+    BIGNUM *q = BN_new();
+    BIGNUM *range = BN_new();
 
     if (!ctx || !q || !range) {
         cerr << "Failed to create BIG NUM or BN_CTX" << endl;
-        BN_free(q); BN_free(range); BN_CTX_free(ctx);
+        BN_free(q);
+        BN_free(range);
+        BN_CTX_free(ctx);
         return nullptr;
     }
 
@@ -36,7 +38,7 @@ BIGNUM* generateQ() {
 
     while (!isPrime(q, ctx)) {
         BN_rand_range(q, range);
-        BN_add(q, q, BN_value_one());  // 确保 q > 2^159
+        BN_add(q, q, BN_value_one()); // 确保 q > 2^159
     }
 
     BN_free(range);
@@ -46,19 +48,22 @@ BIGNUM* generateQ() {
 }
 
 // 生成p使得(p - 1)包含素因子q
-BIGNUM* generateP(const BIGNUM* q) {
+BIGNUM *generateP(const BIGNUM *q) {
     const int Ls[] = {512, 576, 640, 704, 768, 832, 896, 960};
     random_device r;
     const int L = Ls[r() % 8];
 
-    BN_CTX* ctx = BN_CTX_new();
-    BIGNUM* p = BN_new();
-    BIGNUM* temp = BN_new();
-    BIGNUM* one = BN_new();
+    BN_CTX *ctx = BN_CTX_new();
+    BIGNUM *p = BN_new();
+    BIGNUM *temp = BN_new();
+    BIGNUM *one = BN_new();
 
     if (!ctx || !p || !temp || !one) {
         cerr << "Failed to create BIG NUM or BN_CTX" << endl;
-        BN_free(p); BN_free(temp); BN_free(one); BN_CTX_free(ctx);
+        BN_free(p);
+        BN_free(temp);
+        BN_free(one);
+        BN_CTX_free(ctx);
         return nullptr;
     }
 
@@ -73,7 +78,7 @@ BIGNUM* generateP(const BIGNUM* q) {
     } while (!isPrime(p, ctx));
 
     cout << "密钥分量p = ";
-    char* p_str = BN_bn2dec(p);
+    char *p_str = BN_bn2dec(p);
     cout << p_str << endl;
     OPENSSL_free(p_str);
 
@@ -87,7 +92,7 @@ BIGNUM* generateP(const BIGNUM* q) {
 }
 
 // 使用openssl中的SHA256实现的hash函数
-BIGNUM* SHA_hash(const string &M, const bool flagOfPrint) {
+BIGNUM *SHA_hash(const string &M, const bool flagOfPrint) {
     EVP_MD_CTX *ctx = EVP_MD_CTX_new();
     if (!ctx) return nullptr;
     if (!EVP_DigestInit_ex(ctx, EVP_sha256(), nullptr)) {
@@ -106,7 +111,7 @@ BIGNUM* SHA_hash(const string &M, const bool flagOfPrint) {
     }
     EVP_MD_CTX_free(ctx);
 
-    BIGNUM* result = BN_new();
+    BIGNUM *result = BN_new();
     if (!result) {
         cerr << "Failed to create BIG NUM" << endl;
         return nullptr;
@@ -125,7 +130,7 @@ BIGNUM* SHA_hash(const string &M, const bool flagOfPrint) {
     }
 
     if (char *hex_string = BN_bn2hex(result)) {
-        if(flagOfPrint) {
+        if (flagOfPrint) {
             cout << "h(message) = " << hex_string << endl;
         }
         OPENSSL_free(hex_string);
@@ -136,7 +141,7 @@ BIGNUM* SHA_hash(const string &M, const bool flagOfPrint) {
     return result;
 }
 
-bool isSignatureValid(const BIGNUM* r, const BIGNUM* s, const BIGNUM* q) {
+bool isSignatureValid(const BIGNUM *r, const BIGNUM *s, const BIGNUM *q) {
     BN_CTX *ctx = BN_CTX_new();
     if (!ctx) return false;
 
@@ -145,12 +150,12 @@ bool isSignatureValid(const BIGNUM* r, const BIGNUM* s, const BIGNUM* q) {
         BN_CTX_free(ctx);
         return false;
     }
-    BN_zero(zero);  // 设置为0
+    BN_zero(zero); // 设置为0
 
-    const bool isValid = (BN_cmp(r, zero) > 0) &&  // 0 < r
-                         (BN_cmp(r, q) < 0) &&     // r < q
-                         (BN_cmp(s, zero) > 0) &&  // 0 < s
-                         (BN_cmp(s, q) < 0);       // s < q
+    const bool isValid = (BN_cmp(r, zero) > 0) && // 0 < r
+                         (BN_cmp(r, q) < 0) && // r < q
+                         (BN_cmp(s, zero) > 0) && // 0 < s
+                         (BN_cmp(s, q) < 0); // s < q
 
     BN_free(zero);
     BN_CTX_free(ctx);
@@ -158,7 +163,8 @@ bool isSignatureValid(const BIGNUM* r, const BIGNUM* s, const BIGNUM* q) {
     return isValid;
 }
 
-pair<BIGNUM*, BIGNUM*> DSA_sign(const BIGNUM* x, const BIGNUM* k, const BIGNUM* g, const BIGNUM* p, const BIGNUM* q, const string& M) {
+pair<BIGNUM *, BIGNUM *> DSA_sign(const BIGNUM *x, const BIGNUM *k, const BIGNUM *g, const BIGNUM *p, const BIGNUM *q,
+                                  const string &M) {
     BN_CTX *ctx = BN_CTX_new();
     if (!ctx) return {nullptr, nullptr};
 
@@ -224,20 +230,21 @@ pair<BIGNUM*, BIGNUM*> DSA_sign(const BIGNUM* x, const BIGNUM* k, const BIGNUM* 
     return {r, s};
 }
 
-bool DSA_verify(const string& M, const pair<BIGNUM*, BIGNUM*>& sign, const BIGNUM* g, const BIGNUM* q, const BIGNUM* y, const BIGNUM* p) {
+bool DSA_verify(const string &M, const pair<BIGNUM *, BIGNUM *> &sign, const BIGNUM *g, const BIGNUM *q,
+                const BIGNUM *y, const BIGNUM *p) {
     BN_CTX *ctx = BN_CTX_new();
     if (!ctx) return false;
 
     bool result = false;
 
     // 分配所有需要的 BIG NUM
-    BIGNUM* e = SHA_hash(M, false);
-    BIGNUM* w = BN_new();
-    BIGNUM* u1 = BN_new();
-    BIGNUM* u2 = BN_new();
-    BIGNUM* v = BN_new();
-    BIGNUM* temp1 = BN_new();
-    BIGNUM* temp2 = BN_new();
+    BIGNUM *e = SHA_hash(M, false);
+    BIGNUM *w = BN_new();
+    BIGNUM *u1 = BN_new();
+    BIGNUM *u2 = BN_new();
+    BIGNUM *v = BN_new();
+    BIGNUM *temp1 = BN_new();
+    BIGNUM *temp2 = BN_new();
 
     if (!e || !w || !u1 || !u2 || !v || !temp1 || !temp2) {
         goto cleanup;
@@ -277,7 +284,7 @@ bool DSA_verify(const string& M, const pair<BIGNUM*, BIGNUM*>& sign, const BIGNU
         !BN_mod_mul(temp1, temp1, temp2, p, ctx) ||
         !BN_mod(v, temp1, q, ctx)) {
         goto cleanup;
-        }
+    }
 
     cout << "计算 v = ((g^u1 * y^u2) mod p) mod q, v = " << BN_bn2dec(v) << endl;
 
@@ -286,16 +293,16 @@ bool DSA_verify(const string& M, const pair<BIGNUM*, BIGNUM*>& sign, const BIGNU
 
     cout << "签名r = " << BN_bn2dec(sign.first) << endl;
 
-    cleanup:
-        // 释放所有分配的内存
-        BN_free(e);
-        BN_free(w);
-        BN_free(u1);
-        BN_free(u2);
-        BN_free(v);
-        BN_free(temp1);
-        BN_free(temp2);
-        BN_CTX_free(ctx);
+cleanup:
+    // 释放所有分配的内存
+    BN_free(e);
+    BN_free(w);
+    BN_free(u1);
+    BN_free(u2);
+    BN_free(v);
+    BN_free(temp1);
+    BN_free(temp2);
+    BN_CTX_free(ctx);
 
     return result;
 }
@@ -303,11 +310,11 @@ bool DSA_verify(const string& M, const pair<BIGNUM*, BIGNUM*>& sign, const BIGNU
 int main() {
     if (const BN_CTX *ctx = BN_CTX_new(); !ctx) return 0;
 
-    BIGNUM* q = generateQ();
+    BIGNUM *q = generateQ();
     if (!q) BN_free(q);
-    BIGNUM* p = generateP(q);
+    BIGNUM *p = generateP(q);
 
-    BN_CTX* ctx = BN_CTX_new();
+    BN_CTX *ctx = BN_CTX_new();
     if (!ctx) {
         cout << "Failed to create BN_CTX" << endl;
         return 1;
@@ -371,7 +378,7 @@ int main() {
     const string message_fake = "This is a test for RSA";
 
     // 开始签名和验签过程
-    if (const pair<BIGNUM*, BIGNUM*> sign = DSA_sign(x, k, g, p, q, message); sign.first && sign.second) {
+    if (const pair<BIGNUM *, BIGNUM *> sign = DSA_sign(x, k, g, p, q, message); sign.first && sign.second) {
         if (DSA_verify(message, sign, g, q, y, p)) {
             cout << "\nr == v, verify OK!" << endl;
         } else {
